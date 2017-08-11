@@ -18,9 +18,9 @@ current trick info
 
 	3 layer: lying card per player (exclusive bot)
 
-	5 units: sum of card values (over 5, over 10, over 15, over 20, over 30)
+	4 units: sum of card values (over 5, over 10, over 20, over 30)
 
-	3 units: prob teamplayer (exclusive bot)
+	4 units: prob teamplayer (for bot always one)
 
 	1 unit: boolean trick already in team
 

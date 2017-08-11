@@ -10,7 +10,8 @@ LABEL_DATA_PATH = '../../data/label-data/'
 
 class Card:
     sortedTrump = ["D9","DK","D10","DA","DJ","HJ","SJ","CJ","DQ","HQ","SQ","CQ","H10","pig"]
-    sortedNonTrumpValue = ["9","K","10","A"]
+    sortedNonTrumpValues = ["9","K","10","A"]
+    cardPointValues = {"9":0,"J":2,"Q":3,"K":4,"10":10,"A":11}
     
     def __init__(self, shortcut): 
         self.shortcut = shortcut
@@ -29,7 +30,10 @@ class Card:
             return False
         if self.suit != card.suit:
             return False
-        return Card.sortedNonTrumpValue.index(self.value) > Card.sortedNonTrumpValue.index(card.value)
+        return Card.sortedNonTrumpValues.index(self.value) > Card.sortedNonTrumpValues.index(card.value)
+    
+    def get_point_value(self):
+        return Card.cardPointValues[self.value]
     
     def __str__(self):
         s = self.suit + self.value
@@ -48,19 +52,30 @@ class Trick:
         
 
 class Player:
-    def __init__(self,position,handCards):
-        self.position = position
+    def __init__(self,number,handCards):
+        self.number = number
         self.handCards = handCards # handCards for trick x: handCards[x:]
+        self.isRe = len([card for card in handCards if card.shortcut == "CQ"]) > 0
 
 class Game:
     def __init__(self,tricks):
         players = []
         sortedTricks = Game.get_tricks_sorted_by_player(tricks)
         for i in range(4):
-            players.append(Player(i,[trick.cards[i] for trick in sortedTricks]))
+            players.append(Player(i,[trick.cards[i] for trick in sortedTricks])) 
             
         self.players = players
         self.tricks = tricks
+        
+        reQueens = []
+        for t,trick in enumerate(self.tricks):
+            for p,card in enumerate(trick.cards):
+                if card.shortcut == "CQ":
+                    reQueens.append((t,p))
+                    
+        self.reQueens = reQueens # list with entries (trick_num,player_pos) for re-queens
+                    
+            
     
     def get_cards_valid_to_play(self,player_num,trick_num):
         cards = self.players[player_num].handCards[trick_num:]
@@ -78,7 +93,43 @@ class Game:
         sameSuit = [c for c in cards if (c.suit == firstCard.suit and not c.is_trump())]
         if not sameSuit:
             return cards
-        return sameSuit         
+        return sameSuit   
+    
+    def get_player_position(self,player_num,trick_num):
+        return (player_num - self.tricks[trick_num].startingPlayer + 4) % 4
+    
+    def get_player_at_position(self,position,trick_num):
+        return (position + self.tricks[trick_num].startingPlayer) % 4
+
+    def get_currently_lying_cards(self,player_num,trick_num):
+        return self.tricks[trick_num].cards[:self.get_player_position(player_num,trick_num)]
+    
+    def get_probs_teamplayer(self,player_num,trick_num):
+        outedRePlayers = []
+        for (re_t,re_p) in self.reQueens:
+            if re_t < trick_num or (re_t == trick_num and re_p < self.get_player_position(player_num,trick_num)):
+                outedRePlayers.append(self.get_player_at_position(re_p,re_t))
+                
+        print outedRePlayers
+                
+        probs = [0.0]*4          
+        if self.players[player_num].isRe:
+            if len(outedRePlayers) > 0:
+                probs[outedRePlayers[0]] = 1.0
+            else:
+                probs = [0.3]*4
+        else:
+            if len(outedRePlayers) > 1:
+                probs = [1.0]*4
+                probs[outedRePlayers[0]] = 0.0
+                probs[outedRePlayers[1]] = 0.0
+            elif len(outedRePlayers) > 0:
+                probs = [0.5]*4
+                probs[outedRePlayers[0]] = 0.0
+            else:
+                probs = [0.3]*4 
+        probs[player_num] = 1.0       
+        return probs    
     
     @staticmethod
     def rotate(lst, pos):
@@ -117,10 +168,7 @@ for csvfile in os.listdir(PROTOCOLS_PATH):
                 tricks.append(Trick(cards,startingPlayer,winningPlayer))
                 startingPlayer = winningPlayer
         game = Game(tricks)
-        print game
-        print "----------"
-        #sortedGame = Game(game.players,game.get_tricks_sorted_by_player())
-        #print sortedGame
-        print game.get_cards_valid_to_play(1,0)
+        
+        
         
         
