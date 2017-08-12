@@ -2,29 +2,31 @@ input
 
 position encoding: bot, player2, player3, player4 (independent of current position)
 
-hand cards encoding: 4x13
+hand cards encoding: 4x14 (2 if double)
 
-	k,10,a,b_karo,b_herz,b_pik,b_kreuz,...,dulle,schwein
+	9,k,10,a,b_karo,b_herz,b_pik,b_kreuz,...,dulle,schwein
 karo
 herz
 pik
 kreuz
 
 current trick info
+	1 layer: hand cards
 
 	1 layer: valid hand cards
 
 	1 layer: valid higher hand cards
 
-	3 layer: lying card per player (exclusive bot)
+	1 layer: lying cards
 
-	4 units: sum of card values (over 5, over 10, over 20, over 30)
-
-	4 units: prob teamplayer (for bot always one)
+	5 units: sum of card values (over 0, over 5, over 10, over 20, over 30)
 
 	1 unit: boolean trick already in team
 
+	4 units: prob teamplayer (for bot always one)
+
 	4 units: first player
+
 history
 
 	8 layer: played cards per player
@@ -36,4 +38,4 @@ matrix without history 4x13x7
 ----------------------------------------------------
 output
 
-2x20 (all dissimilar cards with scores)
+2x25 (all dissimilar cards with scores)
