@@ -1,6 +1,8 @@
 #!/usr/bin/env python2
 # -*- coding: utf-8 -*-
 
+import argparse
+import glob
 import os
 import csv
 import numpy as np
@@ -61,22 +63,28 @@ class Trick:
         
 
 class Player:
-    def __init__(self,number,handCards):
+    def __init__(self,name,number,handcards):
+        self.name = name
         self.number = number
-        self.handCards = handCards # handCards for trick x: handCards[x:]
-        self.isRe = len([card for card in handCards if card.shortcut == "CQ"]) > 0
+        self.handcards = handcards # handcards for trick x: handcards[x:]
+        self.isRe = len([card for card in self.handcards if card.shortcut == "CQ"]) > 0
+
+    def __str__(self):
+        return self.name + " " + str(self.number)
+    
+    def __repr__(self):
+        return self.__str__()
 
 class Game:
-    def __init__(self,gameID,tricks):
-        players = []
-        sortedTricks = Game.get_tricks_sorted_by_player(tricks)
-        for i in range(4):
-            players.append(Player(i,[trick.cards[i] for trick in sortedTricks])) 
-        
-        self.gameID = gameID
+    def __init__(self,gameID,players,tricks):     
         self.players = players
+        self.gameID = gameID
         self.tricks = tricks
         
+        sortedTricks = Game.get_tricks_sorted_by_player(tricks)
+        for p,player in enumerate(self.players):
+            player.handcards = [trick.cards[p] for trick in sortedTricks] 
+              
         reQueens = []
         for t,trick in enumerate(self.tricks):
             for p,card in enumerate(trick.cards):
@@ -86,11 +94,11 @@ class Game:
         self.reQueens = reQueens # list with entries (trick_num,player_pos) for re-queens
         
     def get_handcards(self,player_num,trick_num):
-        return self.players[player_num].handCards[trick_num:]
+        return self.players[player_num].handcards[trick_num:]
                     
     def get_valid_handcards(self,player_num,trick_num): # handcards that are valid to play in current trick
-        cards = self.players[player_num].handCards[trick_num:]
-        if self.tricks[trick_num].startingPlayer == player_num:
+        cards = self.players[player_num].handcards[trick_num:]
+        if self.tricks[trick_num].startingPlayer.number == player_num:
             firstCard = None
         else:
             firstCard = self.tricks[trick_num].cards[0]
@@ -126,10 +134,10 @@ class Game:
             
     
     def get_player_position(self,player_num,trick_num):
-        return (player_num - self.tricks[trick_num].startingPlayer + 4) % 4
+        return (player_num - self.tricks[trick_num].startingPlayer.number + 4) % 4
     
     def get_player_at_position(self,position,trick_num):
-        return (position + self.tricks[trick_num].startingPlayer) % 4
+        return (position + self.tricks[trick_num].startingPlayer.number) % 4
 
     def get_currently_lying_cards(self,player_num,trick_num):
         return self.tricks[trick_num].cards[:self.get_player_position(player_num,trick_num)]
@@ -184,7 +192,7 @@ class Game:
         sortedTricks = []
         for trick in tricks:
             sortedTricks.append(Trick(Game.rotate(trick.cards,firstPlayer),trick.startingPlayer,trick.winningPlayer))
-            firstPlayer = trick.winningPlayer
+            firstPlayer = trick.winningPlayer.number
         return sortedTricks
       
     def __str__(self):
@@ -215,12 +223,12 @@ def get_entry_matrix(entries):
             
     
 def generate_input_data(game,bot_num,trick_num):
-    handCardsLayer = get_card_matrix(game.get_handcards(bot_num,trick_num))
+    handcardsLayer = get_card_matrix(game.get_handcards(bot_num,trick_num))
     
     validHandCardsLayer = get_card_matrix(game.get_valid_handcards(bot_num,trick_num))
     
     validHigherHandCardsLayer = get_card_matrix(game.get_valid_higher_handcards(bot_num,trick_num))
-    
+
     lyingCards = game.get_currently_lying_cards(bot_num,trick_num)
     lyingCardsLayer = get_card_matrix(lyingCards)
     
@@ -248,18 +256,17 @@ def generate_input_data(game,bot_num,trick_num):
     
     probsTeamPlayerUnits = get_entry_matrix(game.get_probs_teamplayer(bot_num,trick_num))
     
-    entryIdx = game.tricks[trick_num].startingPlayer
+    entryIdx = game.tricks[trick_num].startingPlayer.number
     entries = [0]*4
     entries[entryIdx] = 1
     firstPlayerUnits = get_entry_matrix(entries)
     
     moreInfosLayer = np.hstack((lyingCardsSumUnits,trickInTeamUnits,probsTeamPlayerUnits,firstPlayerUnits))
         
-    inputData = np.stack((handCardsLayer,validHandCardsLayer,validHigherHandCardsLayer,lyingCardsLayer,moreInfosLayer),axis = 0)
+    inputData = np.stack((handcardsLayer,validHandCardsLayer,validHigherHandCardsLayer,lyingCardsLayer,moreInfosLayer),axis = 0)
     
     #if bot_num == 1 and trick_num == 4:
-    #    print inputData
-    #    print inputData.shape
+    #    print handcardsLayer
         
     return inputData
     
@@ -273,23 +280,36 @@ def generate_label_data(game,bot_num,trick_num):
     
     return vector
     
-for csvfile in os.listdir(PROTOCOLS_PATH):
-    if csvfile.endswith('.csv'):
-        f = open(PROTOCOLS_PATH + csvfile)
-        greader = csv.reader(f, delimiter=' ', quotechar='|', quoting=csv.QUOTE_MINIMAL)
-        gameID = csvfile.rsplit('.')[0]
+    
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser()
+    parser.add_argument("-num", type=int)
+    args = parser.parse_args()
+    print(args)
+    number_of_protocols = args.num    
+    
+    files = sorted(glob.glob(PROTOCOLS_PATH + "/*." + 'csv'),key=lambda x: int(x.rsplit('/',1)[1].rsplit('.')[0]))
+    if number_of_protocols and len(files) > number_of_protocols:
+        files = files[:number_of_protocols]
+    for csvfile in files:
+        greader = csv.reader(open(csvfile), delimiter=' ', quotechar='|', quoting=csv.QUOTE_MINIMAL)
+        gameID = csvfile.rsplit('/',1)[1].rsplit('.')[0]
         tricks = []
-        startingPlayer = 0
+        players = []
         for row_count,row in enumerate(greader):
-            if row_count % 2 == 0:
-                winningPlayer = int(row[1][1])
+            if row_count == 0:
+                players = [Player(r,c,[]) for (c,r) in enumerate(row)]
+                startingPlayer = players[0]
+            elif row_count % 2 == 1:
+                winningPlayer = [p for p in players if p.name == row[1]][0]
             else:
                 cards = []
                 for r in row:
                     cards.append(Card(r))
                 tricks.append(Trick(cards,startingPlayer,winningPlayer))
                 startingPlayer = winningPlayer
-        game = Game(gameID,tricks)
+        game = Game(gameID,players,tricks)
+        print("game " + game.gameID)
         for bot_num in range(4):
             for trick_num in range(12):
                 inputData = generate_input_data(game,bot_num,trick_num)
@@ -298,6 +318,6 @@ for csvfile in os.listdir(PROTOCOLS_PATH):
                 pickle.dump(inputData, open(INPUT_DATA_PATH + refNum + '.tr', 'wb'))
                 pickle.dump(labelData, open(LABEL_DATA_PATH + refNum + '.lb', 'wb')) 
         
-        
-        
-        
+            
+            
+            
