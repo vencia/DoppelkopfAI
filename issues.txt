@@ -2,3 +2,4 @@ input normalization
 initial loss too low, expected: -ln(num_classes)
 test loss lower than train loss / test accuracy better
 trick context (handcards etc.) based on chosen card of bot instead of played card in protocol???
+predict on (new) pred-data, pred-data option in protocol_parser
