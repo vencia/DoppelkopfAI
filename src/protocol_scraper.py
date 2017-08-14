@@ -28,16 +28,19 @@ DOMAIN_URL = 'https://www.fuchstreff.de/login.html'
 GAMES_URL = 'https://www.fuchstreff.de/spiele/'
 USER = 'vollzeitspieler'
 PASSWORD = '123456'
-DATA_PATH = '../data/game-protocols/'
+DATA_PATH = '../data/'
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
+    parser.add_argument("num", type=int)
     parser.add_argument("-starting", type=int, default=501)
-    parser.add_argument("-num", type=int, default=600)
+    parser.add_argument("--prediction", dest='prediction', action='store_true')
     args = parser.parse_args()
     print(args)
     starting_id = args.starting
     number_of_protocols = args.num
+    if args.prediction:
+        DATA_PATH += 'prediction/'
     
     # start new session to persist data between requests
     session = requests.Session()
@@ -55,19 +58,7 @@ if __name__ == '__main__':
     
     # log in
     r = session.post(DOMAIN_URL, data=payload, verify = False)
-    
-    # go to game listing page 
-    #games = session.get(GAMES_URL)
-    
-    # go to a game page
-    #matchme = 'a class="vote-widget__button" href="(.*)"'
-    #links = re.findall(matchme,str(games.text))
-    
-    #for link in links:
-    #    linkname = link.rsplit('/',1)[1]
-    #    if linkname.split('-')[1] == 'normalspiel':
-    #        print(linkname)
-    #        game_id = linkname.split('-')[0]
+
     game_id = starting_id
     end_id = starting_id + number_of_protocols
     while game_id < end_id:
@@ -81,7 +72,7 @@ if __name__ == '__main__':
             #players = [p.a['data-username'] for p in soup.find_all('div', 'game-protocol__player')]
             protocol = soup.find_all('div', 'card clearfix')
     
-            with open(DATA_PATH + str(game_id) + '.csv', 'w') as csvfile:
+            with open(DATA_PATH + 'game-protocols/' + str(game_id) + '.csv', 'w') as csvfile:
                 gwriter = csv.writer(csvfile, delimiter=' ', quotechar='|', quoting=csv.QUOTE_MINIMAL)
                 for c, zug in enumerate(protocol):
                     if c == 0:

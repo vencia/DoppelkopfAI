@@ -10,8 +10,6 @@ import keras
 from keras.models import model_from_json
 from keras import backend as K
 
-INPUT_DATA_PATH = '../data/input-data/'
-LABEL_DATA_PATH = '../data/label-data/'
 DATA_PATH = '../data/'
 
 def load_dataset():
@@ -25,8 +23,8 @@ def load_dataset():
             tmp.append(pickle.load(open(f, 'rb')))
         return tmp
         
-    x = load_data(INPUT_DATA_PATH, "tr")
-    y = load_data(LABEL_DATA_PATH, "lb")
+    x = load_data(DATA_PATH + 'prediction/input-data/', "tr")
+    y = load_data(DATA_PATH + 'prediction/label-data/', "lb")
 
     return np.array(x), np.array(y)
     
@@ -49,24 +47,25 @@ class Tee(object): # logging to console and file
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument("model_folder", type=str)
-    parser.add_argument("-game_id", type=int, default=501)
+    parser.add_argument("game_id", type=int)
 
     args = parser.parse_args()
     game_id = str(args.game_id)
-    DATA_PATH += args.model_folder + '/'
-    infoFile = open(DATA_PATH + 'pred_info.log', 'w')
+    #DATA_PATH += args.model_folder + '/'
+    MODEL_PATH = DATA_PATH + args.model_folder + '/'
+    infoFile = open(MODEL_PATH + 'pred_info_' + game_id + '.log', 'w')
     backup = sys.stdout
     sys.stdout = Tee(sys.stdout, infoFile)
     
     print(args)
     
     # load json and create model
-    json_file = open(DATA_PATH + 'model.json', 'r')
+    json_file = open(MODEL_PATH + 'model.json', 'r')
     loaded_model_json = json_file.read()
     json_file.close()
     model = model_from_json(loaded_model_json)
     # load weights into new model
-    model.load_weights(DATA_PATH + "model_weights.h5")
+    model.load_weights(MODEL_PATH + "model_weights.h5")
     print("Loaded model from disk")
      
     x, y = load_dataset()
@@ -90,12 +89,12 @@ if __name__ == '__main__':
     score = model.evaluate(x, y, verbose=0)
     print score
     predictions = model.predict(x)
-    np.savetxt(DATA_PATH + 'predictions.csv',predictions,delimiter=',')
+    np.savetxt(MODEL_PATH + 'pred_' + game_id + '.csv',predictions,delimiter=',')
     for c,pred in enumerate(predictions):
         formatted_predictions = ['%.2f' % p for p in pred]
         player = c / 12
         trick = c % 12
-        print 'player ' + str(player) + ' trick ' + str(trick)
+        print 'player ' + str(player) + ' trick ' + str(trick+1)
         print get_top_cards(pred,3)
         print formatted_predictions
     

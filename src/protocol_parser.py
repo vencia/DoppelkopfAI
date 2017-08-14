@@ -3,16 +3,13 @@
 
 import argparse
 import glob
-import os
 import csv
 import numpy as np
 import pickle
 
 np.set_printoptions(threshold=500)
 
-PROTOCOLS_PATH = '../data/game-protocols/'
-INPUT_DATA_PATH = '../data/input-data/'
-LABEL_DATA_PATH = '../data/label-data/'
+DATA_PATH = '../data/'
 
 class Card:
     sortedTrump = ["D9","DK","D10","DA","DJ","HJ","SJ","CJ","DQ","HQ","SQ","CQ","H10","pig"]
@@ -284,11 +281,15 @@ def generate_label_data(game,bot_num,trick_num):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument("-num", type=int)
+    parser.add_argument("--prediction", dest='prediction', action='store_true')
     args = parser.parse_args()
     print(args)
-    number_of_protocols = args.num    
+    number_of_protocols = args.num  
+    if args.prediction:
+        DATA_PATH += 'prediction/'
+
     
-    files = sorted(glob.glob(PROTOCOLS_PATH + "/*." + 'csv'),key=lambda x: int(x.rsplit('/',1)[1].rsplit('.')[0]))
+    files = sorted(glob.glob(DATA_PATH + 'game-protocols/' + "/*." + 'csv'),key=lambda x: int(x.rsplit('/',1)[1].rsplit('.')[0]))
     if number_of_protocols and len(files) > number_of_protocols:
         files = files[:number_of_protocols]
     for csvfile in files:
@@ -315,8 +316,8 @@ if __name__ == '__main__':
                 inputData = generate_input_data(game,bot_num,trick_num)
                 labelData = generate_label_data(game,bot_num,trick_num)
                 refNum = game.gameID + '_' + str(bot_num) + '_' + str(trick_num)
-                pickle.dump(inputData, open(INPUT_DATA_PATH + refNum + '.tr', 'wb'))
-                pickle.dump(labelData, open(LABEL_DATA_PATH + refNum + '.lb', 'wb')) 
+                pickle.dump(inputData, open(DATA_PATH + 'input-data/' + refNum + '.tr', 'wb'))
+                pickle.dump(labelData, open(DATA_PATH + 'label-data/' + refNum + '.lb', 'wb')) 
         
             
             

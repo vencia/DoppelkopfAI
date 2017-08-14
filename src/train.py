@@ -38,7 +38,7 @@ def load_dataset():
         
     data = load_data(INPUT_DATA_PATH, "tr")
     num_data = len(data)
-    num_val = int(num_data * 0.3)
+    num_val = int(num_data * 0.2)
     x_train = data[:-num_val]
     x_val = data[-num_val:]
     data = load_data(LABEL_DATA_PATH, "lb")
@@ -53,7 +53,7 @@ def build_cnn():
                      activation='relu',
                      input_shape=input_shape))
     model.add(Conv2D(64, (2, 4), activation='relu'))
-    model.add(MaxPooling2D(pool_size=(2, 2)))
+    #model.add(MaxPooling2D(pool_size=(2, 2)))
     #model.add(Dropout(0.2))
     model.add(Flatten())
     model.add(Dense(128, activation='relu'))
@@ -109,8 +109,8 @@ class Tee(object): # logging to console and file
     
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument("-epochs", type=int, default=50)
-    parser.add_argument("-batch_size", type=int, default=12)
+    parser.add_argument("-epochs", type=int, default=10)
+    parser.add_argument("-batch_size", type=int, default=128)
     parser.add_argument("-num_games", type=int)
 
     args = parser.parse_args()
@@ -120,7 +120,7 @@ if __name__ == '__main__':
     if args.num_games:
         dataset_size = args.num_games*4*12
         
-    foldername = datetime.datetime.now().strftime('%Y-%m-%d_%H:%M')
+    foldername = datetime.datetime.now().strftime('%Y-%m-%d_%H-%M')
     DATA_PATH += foldername + '/'
     os.mkdir(DATA_PATH)
     infoFile = open(DATA_PATH + 'train_info.log', 'w')
@@ -152,6 +152,9 @@ if __name__ == '__main__':
     print input_shape
     
     model = build_cnn()
+    
+    print model.summary()
+    
     history = train(model)
     evaluate(model)
     
