@@ -9,6 +9,7 @@ import pickle
 import glob
 import numpy as np
 import argparse
+import random
 import keras
 from keras.models import Sequential
 from keras.layers import Dense, Dropout, Flatten
@@ -30,20 +31,25 @@ def load_dataset():
             sys.exit(0)
         tmp = []
         files = sorted(glob.glob(path + "/*." + ext),key=lambda x: int(x.rsplit('/',1)[1].rsplit('.')[0].replace("_","")))
+        #files = random.shuffle(glob.glob(path + "/*." + ext))
         if dataset_size != 0 and len(files) > dataset_size:
             files = files[:dataset_size]
         for f in files:
             tmp.append(pickle.load(open(f, 'rb')))
         return tmp
         
-    data = load_data(INPUT_DATA_PATH, "tr")
-    num_data = len(data)
-    num_val = int(num_data * 0.2)
-    x_train = data[:-num_val]
-    x_val = data[-num_val:]
-    data = load_data(LABEL_DATA_PATH, "lb")
-    y_train = data[:-num_val]
-    y_val = data[-num_val:]
+    x_data = load_data(INPUT_DATA_PATH, "tr")
+    y_data = load_data(LABEL_DATA_PATH, "lb")
+    
+    data = list(zip(x_data,y_data))
+    random.shuffle(data)
+    x_data[:], y_data[:] = zip(*data)
+    
+    num_val = int(len(x_data) * 0.2)
+    x_train = x_data[:-num_val]
+    x_val = x_data[-num_val:]
+    y_train = y_data[:-num_val]
+    y_val = y_data[-num_val:]
 
     return np.array(x_train), np.array(y_train), np.array(x_val), np.array(y_val)
 
@@ -149,11 +155,12 @@ if __name__ == '__main__':
         K.set_image_dim_ordering('th') # channels first
         
     input_shape = x_train[0].shape
-    print input_shape
+    print 'input shape ' + str(input_shape)
     
     model = build_cnn()
     
     print model.summary()
+    print ''
     
     history = train(model)
     evaluate(model)
