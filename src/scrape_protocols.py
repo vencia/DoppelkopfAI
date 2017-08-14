@@ -78,6 +78,7 @@ if __name__ == '__main__':
                     if c == 0:
                         players = [x.get('data-username') for x in zug.find_all('a', 'profile-link')][:4]
                         player_dict = dict([(p,p) for i,p in enumerate(players)])
+                        gwriter.writerow(['live-protocol'])
                         gwriter.writerow([player_dict[p] for p in players])
                         #player_dict = dict([(p,'P'+str(i)) for i,p in enumerate(players)])
                     trick_from = player_dict[zug.a['data-username']]
