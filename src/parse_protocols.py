@@ -72,7 +72,7 @@ class Player:
     def __repr__(self):
         return self.__str__()
 
-class Game:
+class Game(object):
     def __init__(self,gameID,players,tricks):     
         self.players = players
         self.gameID = gameID
@@ -81,7 +81,10 @@ class Game:
         
         sortedTricks = Game.get_tricks_sorted_by_player(self.tricks)
         for p,player in enumerate(self.players):
-            player.handcards = [trick.cards[p] for trick in sortedTricks] 
+            player.handcards = []
+            for trick in sortedTricks:
+                if p < len(trick.cards):
+                    player.handcards.append(trick.cards[p])
               
         reQueens = []
         for t,trick in enumerate(self.tricks):
@@ -201,7 +204,7 @@ class Game:
         
 class LiveGame(Game):
     def __init__(self,gameID,players,tricks,bot,bot_handcards):     
-        super( LiveGame, self ).__init__(gameID,players,tricks)
+        super(LiveGame, self ).__init__(gameID,players,tricks)
         self.bot = bot
         self.bot.handcards = bot_handcards
         self.current_trick_num = len(tricks)-1
@@ -312,7 +315,7 @@ def parse_live_protocol(gameID,rows):
             players = [Player(r,c,[]) for (c,r) in enumerate(row)]
             startingPlayer = players[0]
         elif row_count == 1:
-            bot = row[0]
+            bot = [p for p in players if p.name == row[0]][0]
             bot_handcards = []
             for r in row[1:]:
                 bot_handcards.append(Card(r))
@@ -326,17 +329,30 @@ def parse_live_protocol(gameID,rows):
             startingPlayer = winningPlayer
     return LiveGame(gameID,players,tricks,bot,bot_handcards)
     
-def write_data(game,bot_num,trick_num):
-      inputData = generate_input_data(game,bot_num,trick_num)
-      #print inputData
-      labelData = generate_label_data(game,bot_num,trick_num)
-      refNum = game.gameID + '_' + str(bot_num) + '_' + "%02d" % trick_num
-      if small_dataset:
-          pickle.dump(inputData, open(DATA_PATH + 'input-data-small/' + refNum + '.tr', 'wb'))
-          pickle.dump(labelData, open(DATA_PATH + 'label-data-small/' + refNum + '.lb', 'wb')) 
-      else:
-          pickle.dump(inputData, open(DATA_PATH + 'input-data/' + refNum + '.tr', 'wb'))
-          pickle.dump(labelData, open(DATA_PATH + 'label-data/' + refNum + '.lb', 'wb')) 
+def write_data(game,bot_num,trick_num,protocol_type):
+    inputData = generate_input_data(game,bot_num,trick_num)
+    if not prediction:
+        labelData = generate_label_data(game,bot_num,trick_num)
+          
+    refNum = game.gameID + '_' + str(bot_num) + '_' + "%02d" % trick_num
+
+ 
+    INPUT_PATH = DATA_PATH + 'input-data'
+    LABEL_PATH = DATA_PATH + 'label-data'
+    if small_dataset:
+        INPUT_PATH += '-small'
+        LABEL_PATH += '-small'
+    if prediction:
+        INPUT_PATH += '-' + protocol_type
+    INPUT_PATH += '/'
+    LABEL_PATH += '/'
+      
+    #pickle.dump(inputData, open(INPUT_PATH + refNum + '.tr', 'wb'))
+    #if not prediction:
+    #    pickle.dump(labelData, open(LABEL_PATH + refNum + '.lb', 'wb')) 
+    np.save(open(INPUT_PATH + refNum, 'wb'),inputData)
+    if not prediction:
+        np.save(open(LABEL_PATH + refNum, 'wb'),labelData)
     
     
 if __name__ == '__main__':
@@ -347,13 +363,17 @@ if __name__ == '__main__':
     args = parser.parse_args()
     print(args)
     #number_of_protocols = args.num  
-    if args.prediction:
-        DATA_PATH += 'prediction/'
+    prediction = args.prediction
     small_dataset = args.small_dataset
+    if small_dataset and prediction:
+        print 'either small trainingset or prediction, not both'
+        sys.exit(0)
     number_of_protocols = None
     if small_dataset:
         number_of_protocols = 100
 
+    if prediction:
+        DATA_PATH += 'prediction/'
     
     files = sorted(glob.glob(DATA_PATH + 'game-protocols/' + "/*." + 'csv'),key=lambda x: int(x.rsplit('/',1)[1].rsplit('.')[0]))
     if number_of_protocols and len(files) > number_of_protocols:
@@ -363,15 +383,18 @@ if __name__ == '__main__':
         gameID = csvfile.rsplit('/',1)[1].rsplit('.')[0]
         firstRow = next(greader)
         if firstRow[0] == 'live-protocol':
-            game = parse_live_protocol(gameID,greader)
-            write_data(game,game.bot.number,game.current_trick_num)
+            if prediction:
+                game = parse_live_protocol(gameID,greader)
+                write_data(game,game.bot.number,game.current_trick_num,'live')
+            else:
+                print 'skip, no live protocols as training data supported'
         elif firstRow[0] == 'full-protocol':
             game = parse_full_protocol(gameID,greader)             
             for bot_num in range(4):
                 for trick_num in range(12):
-                    write_data(game,bot_num,trick_num)
+                    write_data(game,bot_num,trick_num,'full')
         else:
-            print 'invalid first line of protocol: ' + str(firstRow)
+            print 'skip, invalid first line of protocol: ' + str(firstRow)
         print "game " + game.gameID + ' ' + game.game_type             
         
             

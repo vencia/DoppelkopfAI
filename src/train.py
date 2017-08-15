@@ -23,26 +23,27 @@ DATA_PATH = '../data/'
 NUM_CLASSES = 24
 
 def load_dataset():
-    def load_data(path, ext):
+    def load_data(path):
         if not os.path.exists(path):
             print("Path not found: {}".format(path))
             sys.exit(0)
         tmp = []
         #files = glob.glob(path + "/*." + ext)
-        files = sorted(glob.glob(path + "/*." + ext),key=lambda x: int(x.rsplit('/',1)[1].rsplit('.')[0].replace("_","")))
+        files = sorted(glob.glob(path + "/*"),key=lambda x: int(x.rsplit('/',1)[1].rsplit('.')[0].replace("_","")))
         #print files[:20]
         #if dataset_size != 0 and len(files) > dataset_size:
         #    files = files[:dataset_size]
         for f in files:
-            tmp.append(pickle.load(open(f, 'rb')))
+            #tmp.append(pickle.load(open(f, 'rb')))
+            tmp.append(np.load(open(f, 'rb')))
         return tmp
     
     if small_dataset:
-        x_data = load_data(DATA_PATH + 'input-data-small/', "tr")
-        y_data = load_data(DATA_PATH + 'label-data-small/', "lb")
+        x_data = load_data(DATA_PATH + 'input-data-small/')
+        y_data = load_data(DATA_PATH + 'label-data-small/')
     else:
-        x_data = load_data(DATA_PATH + 'input-data/', "tr")
-        y_data = load_data(DATA_PATH + 'label-data/', "lb")
+        x_data = load_data(DATA_PATH + 'input-data/')
+        y_data = load_data(DATA_PATH + 'label-data/')
     
     # shuffle changes axes ordering??!!!
     #data = list(zip(x_data,y_data))
@@ -67,12 +68,13 @@ def build_cnn():
     #model.add(Dropout(0.2))
     model.add(Flatten())
     model.add(Dense(128, activation='relu'))
-    #model.add(Dropout(0.2))
+    model.add(Dropout(0.2))
     model.add(Dense(NUM_CLASSES, activation='softmax'))
     
     model.compile(loss=keras.losses.categorical_crossentropy,
                   optimizer=keras.optimizers.Adam(lr=learning_rate),
                   metrics=['accuracy'])
+    
     return model
 
 def train(model):    
@@ -109,6 +111,9 @@ def plot(history):
     plt.legend(['train', 'test'], loc='upper left')
    # plt.show()
     plt.savefig(MODEL_PATH + 'loss.png')
+    
+def get_execution_time_in_minutes(start_time):
+    return int((datetime.datetime.now() - start_time).total_seconds()/60)
     
 class Tee(object): # logging to console and file
     def __init__(self, *files):
@@ -152,7 +157,9 @@ if __name__ == '__main__':
 
     print(args)
     print("Loading data...")
+    start_loading_data = datetime.datetime.now()
     x_train, y_train, x_val, y_val = load_dataset()
+    print 'Loading data took ' + str(get_execution_time_in_minutes(start_loading_data)) + ' minutes'
     
     K.set_image_dim_ordering('th')
     if K.backend() == 'theano':
@@ -162,14 +169,17 @@ if __name__ == '__main__':
         x_val = np.swapaxes(x_val,1,2)
         
     input_shape = x_train[0].shape
-    print 'Input shape ' + str(input_shape)
+    print 'Input shape' + str(input_shape)
 
     model = build_cnn()
 
     print model.summary()
     print ''
     
+    start_training = datetime.datetime.now()
     history = train(model)
+    print 'Training took ' + str(get_execution_time_in_minutes(start_training)) + ' minutes'
+
     evaluate(model)
     
     # serialize model to JSON
