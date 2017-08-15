@@ -77,8 +77,9 @@ class Game:
         self.players = players
         self.gameID = gameID
         self.tricks = tricks
+        self.game_type = 'full'
         
-        sortedTricks = Game.get_tricks_sorted_by_player(tricks)
+        sortedTricks = Game.get_tricks_sorted_by_player(self.tricks)
         for p,player in enumerate(self.players):
             player.handcards = [trick.cards[p] for trick in sortedTricks] 
               
@@ -197,6 +198,15 @@ class Game:
         for t,trick in enumerate(self.tricks):
             s += "trick " + str(t) +  ", starting player " + str(trick.startingPlayer) + ", winning player " + str(trick.winningPlayer) + "\n" + str(trick.cards) + "\n"
         return s
+        
+class LiveGame(Game):
+    def __init__(self,gameID,players,tricks,bot,bot_handcards):     
+        super( LiveGame, self ).__init__(gameID,players,tricks)
+        self.bot = bot
+        self.bot.handcards = bot_handcards
+        self.current_trick_num = len(tricks)-1
+        self.game_type = 'live'
+ 
     
 def get_card_matrix(cards):
     matrix = np.zeros(shape=(4,14))
@@ -262,8 +272,8 @@ def generate_input_data(game,bot_num,trick_num):
         
     inputData = np.stack((handcardsLayer,validHandCardsLayer,validHigherHandCardsLayer,lyingCardsLayer,moreInfosLayer),axis = 0)
     
-    #if bot_num == 1 and trick_num == 4:
-    #    print handcardsLayer
+    #if bot_num == 2 and trick_num == 9:
+    #    print inputData
         
     return inputData
     
@@ -272,21 +282,77 @@ def generate_label_data(game,bot_num,trick_num):
     playedCard = game.tricks[trick_num].cards[game.get_player_position(bot_num,trick_num)]
     playedCardIdx = Card.sortedValues.index(playedCard.value) + Card.sortedSuits.index(playedCard.suit)*6
     vector[playedCardIdx] = 1
-    #if bot_num == 0 and trick_num == 2:
+    #if bot_num == 1 and trick_num == 9:
     #    print vector
     
     return vector
     
+def parse_full_protocol(gameID,rows):
+    tricks = []
+    players = []
+    for row_count,row in enumerate(rows):
+        if row_count == 0:
+            players = [Player(r,c,[]) for (c,r) in enumerate(row)]
+            startingPlayer = players[0]
+        elif row_count % 2 == 1:
+            winningPlayer = [p for p in players if p.name == row[1]][0]
+        else:
+            cards = []
+            for r in row:
+                cards.append(Card(r))
+            tricks.append(Trick(cards,startingPlayer,winningPlayer))
+            startingPlayer = winningPlayer
+    return Game(gameID,players,tricks)
+        
+def parse_live_protocol(gameID,rows):
+    tricks = []
+    players = []
+    for row_count,row in enumerate(rows):
+        if row_count == 0:
+            players = [Player(r,c,[]) for (c,r) in enumerate(row)]
+            startingPlayer = players[0]
+        elif row_count == 1:
+            bot = row[0]
+            bot_handcards = []
+            for r in row[1:]:
+                bot_handcards.append(Card(r))
+        elif row_count % 2 != 1:
+            winningPlayer = [p for p in players if p.name == row[1]][0]
+        else:
+            cards = []
+            for r in row:
+                cards.append(Card(r))
+            tricks.append(Trick(cards,startingPlayer,winningPlayer))
+            startingPlayer = winningPlayer
+    return LiveGame(gameID,players,tricks,bot,bot_handcards)
+    
+def write_data(game,bot_num,trick_num):
+      inputData = generate_input_data(game,bot_num,trick_num)
+      #print inputData
+      labelData = generate_label_data(game,bot_num,trick_num)
+      refNum = game.gameID + '_' + str(bot_num) + '_' + "%02d" % trick_num
+      if small_dataset:
+          pickle.dump(inputData, open(DATA_PATH + 'input-data-small/' + refNum + '.tr', 'wb'))
+          pickle.dump(labelData, open(DATA_PATH + 'label-data-small/' + refNum + '.lb', 'wb')) 
+      else:
+          pickle.dump(inputData, open(DATA_PATH + 'input-data/' + refNum + '.tr', 'wb'))
+          pickle.dump(labelData, open(DATA_PATH + 'label-data/' + refNum + '.lb', 'wb')) 
+    
     
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument("-num", type=int)
+    #parser.add_argument("-num", type=int)
     parser.add_argument("--prediction", dest='prediction', action='store_true')
+    parser.add_argument("--small", dest='small_dataset', action='store_true')
     args = parser.parse_args()
     print(args)
-    number_of_protocols = args.num  
+    #number_of_protocols = args.num  
     if args.prediction:
         DATA_PATH += 'prediction/'
+    small_dataset = args.small_dataset
+    number_of_protocols = None
+    if small_dataset:
+        number_of_protocols = 100
 
     
     files = sorted(glob.glob(DATA_PATH + 'game-protocols/' + "/*." + 'csv'),key=lambda x: int(x.rsplit('/',1)[1].rsplit('.')[0]))
@@ -295,29 +361,18 @@ if __name__ == '__main__':
     for csvfile in files:
         greader = csv.reader(open(csvfile), delimiter=' ', quotechar='|', quoting=csv.QUOTE_MINIMAL)
         gameID = csvfile.rsplit('/',1)[1].rsplit('.')[0]
-        tricks = []
-        players = []
-        for row_count,row in enumerate(greader):
-            if row_count == 0:
-                players = [Player(r,c,[]) for (c,r) in enumerate(row)]
-                startingPlayer = players[0]
-            elif row_count % 2 == 1:
-                winningPlayer = [p for p in players if p.name == row[1]][0]
-            else:
-                cards = []
-                for r in row:
-                    cards.append(Card(r))
-                tricks.append(Trick(cards,startingPlayer,winningPlayer))
-                startingPlayer = winningPlayer
-        game = Game(gameID,players,tricks)
-        print("game " + game.gameID)
-        for bot_num in range(4):
-            for trick_num in range(12):
-                inputData = generate_input_data(game,bot_num,trick_num)
-                labelData = generate_label_data(game,bot_num,trick_num)
-                refNum = game.gameID + '_' + str(bot_num) + '_' + str(trick_num)
-                pickle.dump(inputData, open(DATA_PATH + 'input-data/' + refNum + '.tr', 'wb'))
-                pickle.dump(labelData, open(DATA_PATH + 'label-data/' + refNum + '.lb', 'wb')) 
+        firstRow = next(greader)
+        if firstRow[0] == 'live-protocol':
+            game = parse_live_protocol(gameID,greader)
+            write_data(game,game.bot.number,game.current_trick_num)
+        elif firstRow[0] == 'full-protocol':
+            game = parse_full_protocol(gameID,greader)             
+            for bot_num in range(4):
+                for trick_num in range(12):
+                    write_data(game,bot_num,trick_num)
+        else:
+            print 'invalid first line of protocol: ' + str(firstRow)
+        print "game " + game.gameID + ' ' + game.game_type             
         
             
             
