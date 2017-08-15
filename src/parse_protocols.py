@@ -272,8 +272,8 @@ def generate_input_data(game,bot_num,trick_num):
         
     inputData = np.stack((handcardsLayer,validHandCardsLayer,validHigherHandCardsLayer,lyingCardsLayer,moreInfosLayer),axis = 0)
     
-    #if bot_num == 1 and trick_num == 4:
-    #    print handcardsLayer
+    #if bot_num == 2 and trick_num == 9:
+    #    print inputData
         
     return inputData
     
@@ -282,7 +282,7 @@ def generate_label_data(game,bot_num,trick_num):
     playedCard = game.tricks[trick_num].cards[game.get_player_position(bot_num,trick_num)]
     playedCardIdx = Card.sortedValues.index(playedCard.value) + Card.sortedSuits.index(playedCard.suit)*6
     vector[playedCardIdx] = 1
-    #if bot_num == 0 and trick_num == 2:
+    #if bot_num == 1 and trick_num == 9:
     #    print vector
     
     return vector
@@ -328,24 +328,34 @@ def parse_live_protocol(gameID,rows):
     
 def write_data(game,bot_num,trick_num):
       inputData = generate_input_data(game,bot_num,trick_num)
-      print inputData
+      #print inputData
       labelData = generate_label_data(game,bot_num,trick_num)
-      refNum = game.gameID + '_' + str(bot_num) + '_' + str(trick_num)
-      pickle.dump(inputData, open(DATA_PATH + 'input-data-test/' + refNum + '.tr', 'wb'))
-      pickle.dump(labelData, open(DATA_PATH + 'label-data-test/' + refNum + '.lb', 'wb')) 
+      refNum = game.gameID + '_' + str(bot_num) + '_' + "%02d" % trick_num
+      if small_dataset:
+          pickle.dump(inputData, open(DATA_PATH + 'input-data-small/' + refNum + '.tr', 'wb'))
+          pickle.dump(labelData, open(DATA_PATH + 'label-data-small/' + refNum + '.lb', 'wb')) 
+      else:
+          pickle.dump(inputData, open(DATA_PATH + 'input-data/' + refNum + '.tr', 'wb'))
+          pickle.dump(labelData, open(DATA_PATH + 'label-data/' + refNum + '.lb', 'wb')) 
+    
     
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument("-num", type=int)
+    #parser.add_argument("-num", type=int)
     parser.add_argument("--prediction", dest='prediction', action='store_true')
+    parser.add_argument("--small", dest='small_dataset', action='store_true')
     args = parser.parse_args()
     print(args)
-    number_of_protocols = args.num  
+    #number_of_protocols = args.num  
     if args.prediction:
         DATA_PATH += 'prediction/'
+    small_dataset = args.small_dataset
+    number_of_protocols = None
+    if small_dataset:
+        number_of_protocols = 100
 
     
-    files = sorted(glob.glob(DATA_PATH + 'game-protocols-test/' + "/*." + 'csv'),key=lambda x: int(x.rsplit('/',1)[1].rsplit('.')[0]))
+    files = sorted(glob.glob(DATA_PATH + 'game-protocols/' + "/*." + 'csv'),key=lambda x: int(x.rsplit('/',1)[1].rsplit('.')[0]))
     if number_of_protocols and len(files) > number_of_protocols:
         files = files[:number_of_protocols]
     for csvfile in files:
@@ -361,7 +371,7 @@ if __name__ == '__main__':
                 for trick_num in range(12):
                     write_data(game,bot_num,trick_num)
         else:
-            print 'invalid first line of protocol: ' + firstRow
+            print 'invalid first line of protocol: ' + str(firstRow)
         print "game " + game.gameID + ' ' + game.game_type             
         
             

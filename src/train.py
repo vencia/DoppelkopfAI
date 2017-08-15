@@ -18,8 +18,6 @@ from keras import backend as K
 from keras.callbacks import CSVLogger
 from keras.callbacks import TensorBoard
 
-INPUT_DATA_PATH = '../data/input-data/'
-LABEL_DATA_PATH = '../data/label-data/'
 DATA_PATH = '../data/'
 
 NUM_CLASSES = 24
@@ -30,21 +28,27 @@ def load_dataset():
             print("Path not found: {}".format(path))
             sys.exit(0)
         tmp = []
+        #files = glob.glob(path + "/*." + ext)
         files = sorted(glob.glob(path + "/*." + ext),key=lambda x: int(x.rsplit('/',1)[1].rsplit('.')[0].replace("_","")))
-        #files = random.shuffle(glob.glob(path + "/*." + ext))
-        if dataset_size != 0 and len(files) > dataset_size:
-            files = files[:dataset_size]
+        #print files[:20]
+        #if dataset_size != 0 and len(files) > dataset_size:
+        #    files = files[:dataset_size]
         for f in files:
             tmp.append(pickle.load(open(f, 'rb')))
         return tmp
-        
-    x_data = load_data(INPUT_DATA_PATH, "tr")
-    y_data = load_data(LABEL_DATA_PATH, "lb")
     
-    data = list(zip(x_data,y_data))
-    random.shuffle(data)
-    x_data[:], y_data[:] = zip(*data)
+    if small_dataset:
+        x_data = load_data(DATA_PATH + 'input-data-small/', "tr")
+        y_data = load_data(DATA_PATH + 'label-data-small/', "lb")
+    else:
+        x_data = load_data(DATA_PATH + 'input-data/', "tr")
+        y_data = load_data(DATA_PATH + 'label-data/', "lb")
     
+    # shuffle changes axes ordering??!!!
+    #data = list(zip(x_data,y_data))
+    #random.shuffle(data)
+    #x_data[:], y_data[:] = zip(*data)
+  
     num_val = int(len(x_data) * 0.2)
     x_train = x_data[:-num_val]
     x_val = x_data[-num_val:]
@@ -67,7 +71,7 @@ def build_cnn():
     model.add(Dense(NUM_CLASSES, activation='softmax'))
     
     model.compile(loss=keras.losses.categorical_crossentropy,
-                  optimizer=keras.optimizers.Adadelta(),
+                  optimizer=keras.optimizers.Adam(lr=learning_rate),
                   metrics=['accuracy'])
     return model
 
@@ -93,7 +97,7 @@ def plot(history):
     plt.xlabel('epoch')
     plt.legend(['train', 'test'], loc='upper left')
     #plt.show()
-    plt.savefig(DATA_PATH + 'accuracy.png')
+    plt.savefig(MODEL_PATH + 'accuracy.png')
     plt.clf()
     
     # summarize history for loss
@@ -104,7 +108,7 @@ def plot(history):
     plt.xlabel('epoch')
     plt.legend(['train', 'test'], loc='upper left')
    # plt.show()
-    plt.savefig(DATA_PATH + 'loss.png')
+    plt.savefig(MODEL_PATH + 'loss.png')
     
 class Tee(object): # logging to console and file
     def __init__(self, *files):
@@ -117,48 +121,51 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument("-epochs", type=int, default=10)
     parser.add_argument("-batch_size", type=int, default=128)
-    parser.add_argument("-num_games", type=int)
+    parser.add_argument("-lr", type=float, default=0.001)
+    #parser.add_argument("-num_games", type=int)
+    parser.add_argument("--small", dest='small_dataset', action='store_true')
+
 
     args = parser.parse_args()
     epochs = args.epochs
     batch_size = args.batch_size
-    dataset_size = 0
-    if args.num_games:
-        dataset_size = args.num_games*4*12
+    learning_rate = args.lr
+    #dataset_size = 0
+    #if args.num_games:
+    #    dataset_size = args.num_games*4*12
+    small_dataset = args.small_dataset
         
     foldername = datetime.datetime.now().strftime('%Y-%m-%d_%H-%M')
-    DATA_PATH += foldername + '/'
-    os.mkdir(DATA_PATH)
-    infoFile = open(DATA_PATH + 'train_info.log', 'w')
+    MODEL_PATH = DATA_PATH + foldername + '/'
+    os.mkdir(MODEL_PATH)
+    infoFile = open(MODEL_PATH + 'train_info.log', 'w')
     backup = sys.stdout
     sys.stdout = Tee(sys.stdout, infoFile)
+    
     callback_loggers = []
-    csv_logger = CSVLogger(DATA_PATH + 'training.csv')
+    csv_logger = CSVLogger(MODEL_PATH + 'training.csv')
     callback_loggers.append(csv_logger)
     if K.backend() == 'tensorflow':
-        tensorboard_logger = TensorBoard(log_dir=DATA_PATH + 'tensorboard', histogram_freq=0, batch_size=batch_size, write_graph=True, write_grads=False, write_images=True, embeddings_freq=0, embeddings_layer_names=None, embeddings_metadata=None)
+        tensorboard_logger = TensorBoard(log_dir=MODEL_PATH + 'tensorboard', histogram_freq=0, batch_size=batch_size, write_graph=True, write_grads=False, write_images=True, embeddings_freq=0, embeddings_layer_names=None, embeddings_metadata=None)
         callback_loggers.append(tensorboard_logger)
         #tensorboard --logdir=/full_path_to_your_logs
-
 
     print(args)
     print("Loading data...")
     x_train, y_train, x_val, y_val = load_dataset()
     
-    if K.backend() == 'tensorflow':
-        K.set_image_dim_ordering('tf') # channels last
+    K.set_image_dim_ordering('th')
+    if K.backend() == 'theano':
         x_train = np.swapaxes(x_train,1,3)
         x_train = np.swapaxes(x_train,1,2)
         x_val = np.swapaxes(x_val,1,3)
         x_val = np.swapaxes(x_val,1,2)
-    else:
-        K.set_image_dim_ordering('th') # channels first
         
     input_shape = x_train[0].shape
-    print 'input shape ' + str(input_shape)
-    
+    print 'Input shape ' + str(input_shape)
+
     model = build_cnn()
-    
+
     print model.summary()
     print ''
     
@@ -167,10 +174,10 @@ if __name__ == '__main__':
     
     # serialize model to JSON
     model_json = model.to_json()
-    with open(DATA_PATH  + "model.json", "w") as json_file:
+    with open(MODEL_PATH  + "model.json", "w") as json_file:
         json_file.write(model_json)
     # serialize weights to HDF5
-    model.save_weights(DATA_PATH + "model_weights.h5")
+    model.save_weights(MODEL_PATH + "model_weights.h5")
     
     plot(history)
     
