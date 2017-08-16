@@ -13,20 +13,29 @@ from keras import backend as K
 DATA_PATH = '../data/'
 
 def load_dataset():
-    def load_data(path, ext):
+    def load_data(path):
         if not os.path.exists(path):
             print("Path not found: {}".format(path))
             sys.exit(0)
-        tmp = []
-        files = sorted(glob.glob(path + game_id + "_*." + ext),key=lambda x: int(x.rsplit('/',1)[1].rsplit('.')[0].replace("_","")))
+        tmp_x = []
+        tmp_b = []
+        tmp_t = []
+        files = sorted(glob.glob(path + game_id + '*'),key=lambda x: int(x.rsplit('/',1)[1].rsplit('.')[0].replace("_","")))
         for f in files:
-            tmp.append(pickle.load(open(f, 'rb')))
-        return tmp
-        
-    x = load_data(DATA_PATH + 'prediction/input-data/', "tr")
-    y = load_data(DATA_PATH + 'prediction/label-data/', "lb")
+            #tmp.append(pickle.load(open(f, 'rb')))
+            trick_num = int(f.split('_')[2])
+            bot_num = int(f.split('_')[1])
+            tmp_x.append(np.load(open(f, 'rb')))
+            tmp_b.append(bot_num)
+            tmp_t.append(trick_num)
+        return tmp_x, tmp_b, tmp_t
 
-    return np.array(x), np.array(y)
+    x, b, t = load_data(DATA_PATH + 'prediction/input-data-' + game_type + '/')
+
+
+    #y = load_data(DATA_PATH + 'prediction/label-data/')
+
+    return np.array(x), b, t
     
 def get_top_cards(pred,top_num):
     sortedValues = ["9","10","J","Q","K","A"]
@@ -46,14 +55,19 @@ class Tee(object): # logging to console and file
             
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument("model_folder", type=str)
-    parser.add_argument("game_id", type=int)
+    parser.add_argument('model_folder', type=str)
+    parser.add_argument('game_id', type=int)
+    parser.add_argument('--live', dest='live', action='store_true')
 
     args = parser.parse_args()
     game_id = str(args.game_id)
-    #DATA_PATH += args.model_folder + '/'
+    if args.live:
+        game_type = 'live'
+    else:
+        game_type = 'full'
+    
     MODEL_PATH = DATA_PATH + args.model_folder + '/'
-    infoFile = open(MODEL_PATH + 'pred_info_' + game_id + '.log', 'w')
+    infoFile = open(MODEL_PATH + 'pred_info_' + game_id + '_' + game_type + '.log', 'w')
     backup = sys.stdout
     sys.stdout = Tee(sys.stdout, infoFile)
     
@@ -66,16 +80,16 @@ if __name__ == '__main__':
     model = model_from_json(loaded_model_json)
     # load weights into new model
     model.load_weights(MODEL_PATH + "model_weights.h5")
-    print("Loaded model from disk")
+    #print("Loaded model from disk")
      
-    x, y = load_dataset()
+    x, b, t = load_dataset()
+    #print x.shape
+    #print dataset
     
-    if K.backend() == 'tensorflow':
-        K.set_image_dim_ordering('tf') # channels last
-        x = np.swapaxes(x,1,3)
+    K.set_image_dim_ordering('th')
+    if K.backend() == 'theano':
         x = np.swapaxes(x,1,2)
-    else:
-        K.set_image_dim_ordering('th') # channels first
+        x = np.swapaxes(x,1,3)
         
     input_shape = x[0].shape
     print input_shape
@@ -85,15 +99,16 @@ if __name__ == '__main__':
                   optimizer=keras.optimizers.Adadelta(),
                   metrics=['accuracy'])
     
+    #score = model.evaluate(x, y, verbose=0)
 
-    score = model.evaluate(x, y, verbose=0)
-    print score
     predictions = model.predict(x)
-    np.savetxt(MODEL_PATH + 'pred_' + game_id + '.csv',predictions,delimiter=',')
+    np.savetxt(MODEL_PATH + 'pred_' + game_id + '_' + game_type + '.csv',predictions)
     for c,pred in enumerate(predictions):
         formatted_predictions = ['%.2f' % p for p in pred]
-        player = c / 12
-        trick = c % 12
+        player = b[c]
+        trick = t[c]
+        #if player == 0 and trick == 4:
+        #    print x[c]
         print 'player ' + str(player) + ' trick ' + str(trick+1)
         print get_top_cards(pred,3)
         print formatted_predictions

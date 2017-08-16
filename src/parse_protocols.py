@@ -2,6 +2,7 @@
 # -*- coding: utf-8 -*-
 
 import argparse
+import sys
 import glob
 import csv
 import numpy as np
@@ -51,6 +52,16 @@ class Card:
     
     def __repr__(self):
         return self.__str__()
+    
+    def __eq__(self, other):
+        if isinstance(other, Card):
+            return self.shortcut == other.shortcut
+        return NotImplemented
+    def __ne__(self, other):
+        result = self.__eq__(other)
+        if result is NotImplemented:
+            return result
+        return not result
         
 class Trick:
     def __init__(self, cards, startingPlayer, winningPlayer):
@@ -63,7 +74,8 @@ class Player:
     def __init__(self,name,number,handcards):
         self.name = name
         self.number = number
-        self.handcards = handcards # handcards for trick x: handcards[x:]
+        self.handcards = handcards # not sorted
+        self.played_cards = [] # sorted: played_cards[:trick_num] for already played cards for current trick
         self.isRe = len([card for card in self.handcards if card.shortcut == "CQ"]) > 0
 
     def __str__(self):
@@ -81,24 +93,27 @@ class Game(object):
         
         sortedTricks = Game.get_tricks_sorted_by_player(self.tricks)
         for p,player in enumerate(self.players):
+            #print player
             player.handcards = []
             for trick in sortedTricks:
-                if p < len(trick.cards):
+                if p < len(trick.cards) and trick.cards[p]:
                     player.handcards.append(trick.cards[p])
+                    player.played_cards.append(trick.cards[p])
+                    #print player.played_cards
               
         reQueens = []
         for t,trick in enumerate(self.tricks):
             for p,card in enumerate(trick.cards):
-                if card.shortcut == "CQ":
+                if card and card.shortcut == "CQ":
                     reQueens.append((t,p))
                     
         self.reQueens = reQueens # list with entries (trick_num,player_pos) for re-queens
         
     def get_handcards(self,player_num,trick_num):
-        return self.players[player_num].handcards[trick_num:]
+        return [c for c in self.players[player_num].handcards if c not in (self.players[player_num].played_cards[:trick_num])]
                     
     def get_valid_handcards(self,player_num,trick_num): # handcards that are valid to play in current trick
-        cards = self.players[player_num].handcards[trick_num:]
+        cards = self.get_handcards(player_num,trick_num)
         if self.tricks[trick_num].startingPlayer.number == player_num:
             firstCard = None
         else:
@@ -118,7 +133,7 @@ class Game(object):
     def get_valid_higher_handcards(self,player_num,trick_num): # valid handcards that are higher than currently lying cards
         currentHighestCardPos = self.get_current_highest_card_pos(player_num,trick_num)
         currentHighestCard = None
-        if currentHighestCardPos != -1:
+        if currentHighestCardPos:
             currentHighestCard = self.tricks[trick_num].cards[currentHighestCardPos]
         return [card for card in self.get_valid_handcards(player_num,trick_num) if card.is_higher_than(currentHighestCard)] 
                 
@@ -193,7 +208,8 @@ class Game(object):
         sortedTricks = []
         for trick in tricks:
             sortedTricks.append(Trick(Game.rotate(trick.cards,firstPlayer),trick.startingPlayer,trick.winningPlayer))
-            firstPlayer = trick.winningPlayer.number
+            if trick.winningPlayer:
+                firstPlayer = trick.winningPlayer.number
         return sortedTricks
       
     def __str__(self):
@@ -320,13 +336,23 @@ def parse_live_protocol(gameID,rows):
             for r in row[1:]:
                 bot_handcards.append(Card(r))
         elif row_count % 2 != 1:
-            winningPlayer = [p for p in players if p.name == row[1]][0]
+            assert int(row[0]) == len(tricks) + 1
+            if len(row) > 1:
+                winningPlayer = [p for p in players if p.name == row[1]][0]
+            else:
+                winningPlayer = None
         else:
             cards = []
             for r in row:
                 cards.append(Card(r))
             tricks.append(Trick(cards,startingPlayer,winningPlayer))
             startingPlayer = winningPlayer
+    if len(tricks) == 0 or len(tricks[len(tricks)-1].cards) == 4: # bot is first -> no cards lying
+        assert startingPlayer == bot
+        assert winningPlayer == None
+        tricks.append(Trick([],startingPlayer,winningPlayer))
+    for i in range(4-len(tricks[len(tricks)-1].cards)):
+        tricks[len(tricks)-1].cards.append(None)
     return LiveGame(gameID,players,tricks,bot,bot_handcards)
     
 def write_data(game,bot_num,trick_num,protocol_type):
@@ -375,17 +401,28 @@ if __name__ == '__main__':
     if prediction:
         DATA_PATH += 'prediction/'
     
-    files = sorted(glob.glob(DATA_PATH + 'game-protocols/' + "/*." + 'csv'),key=lambda x: int(x.rsplit('/',1)[1].rsplit('.')[0]))
+    #files = sorted(glob.glob(DATA_PATH + 'game-protocols/' + "/*." + 'csv'),key=lambda x: int(x.rsplit('/',1)[1].rsplit('.')[0]))
+    files = sorted(glob.glob(DATA_PATH + 'game-protocols/' + "/*.csv"),key=lambda x: int(x.rsplit('/',1)[1].rsplit('.')[0].replace("_","")))
     if number_of_protocols and len(files) > number_of_protocols:
         files = files[:number_of_protocols]
     for csvfile in files:
         greader = csv.reader(open(csvfile), delimiter=' ', quotechar='|', quoting=csv.QUOTE_MINIMAL)
-        gameID = csvfile.rsplit('/',1)[1].rsplit('.')[0]
+        gameID = csvfile.rsplit('/',1)[1].split('_')[0].split('.')[0]
         firstRow = next(greader)
         if firstRow[0] == 'live-protocol':
             if prediction:
+                t = int(csvfile.split('_')[2].split('.')[0])
+                b = int(csvfile.split('_')[1].split('.')[0])
                 game = parse_live_protocol(gameID,greader)
-                write_data(game,game.bot.number,game.current_trick_num,'live')
+                if b == game.bot.number and t == game.current_trick_num:
+                    write_data(game,b,t,'live')
+                    print game.game_type + " game " + game.gameID + '_' + str(b) + '_' + "%02d" % t
+                else:
+                    print 'skip ' + game.game_type + " game " + game.gameID + '_' + str(b) + '_' + "%02d" % t + ', live protocol name differs from content'
+                    print b
+                    print game.bot.number
+                    print t
+                    print game.current_trick_num
             else:
                 print 'skip, no live protocols as training data supported'
         elif firstRow[0] == 'full-protocol':
@@ -393,9 +430,9 @@ if __name__ == '__main__':
             for bot_num in range(4):
                 for trick_num in range(12):
                     write_data(game,bot_num,trick_num,'full')
+            print game.game_type + " game " + game.gameID           
         else:
-            print 'skip, invalid first line of protocol: ' + str(firstRow)
-        print "game " + game.gameID + ' ' + game.game_type             
+            print 'skip ' + game.gameID + ', invalid first line of protocol: ' + str(firstRow)
         
             
             
