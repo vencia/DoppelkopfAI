@@ -110,10 +110,15 @@ class Game(object):
         self.reQueens = reQueens # list with entries (trick_num,player_pos) for re-queens
         
     def get_handcards(self,player_num,trick_num):
-        return [c for c in self.players[player_num].handcards if c not in (self.players[player_num].played_cards[:trick_num])]
-                    
+        #return [c for c in self.players[player_num].handcards if c not in (self.players[player_num].played_cards[:trick_num])]
+        handcards_copy = self.players[player_num].handcards[:]
+        for card in self.players[player_num].played_cards[:trick_num]:
+            handcards_copy.remove(card)
+        return handcards_copy                    
     def get_valid_handcards(self,player_num,trick_num): # handcards that are valid to play in current trick
         cards = self.get_handcards(player_num,trick_num)
+        #if player_num == 0 and trick_num == 3:
+        #    print cards
         if self.tricks[trick_num].startingPlayer.number == player_num:
             firstCard = None
         else:
@@ -132,8 +137,10 @@ class Game(object):
     
     def get_valid_higher_handcards(self,player_num,trick_num): # valid handcards that are higher than currently lying cards
         currentHighestCardPos = self.get_current_highest_card_pos(player_num,trick_num)
+        #if player_num == 1 and trick_num == 1:
+         #   print currentHighestCardPos
         currentHighestCard = None
-        if currentHighestCardPos:
+        if not currentHighestCardPos == None:
             currentHighestCard = self.tricks[trick_num].cards[currentHighestCardPos]
         return [card for card in self.get_valid_handcards(player_num,trick_num) if card.is_higher_than(currentHighestCard)] 
                 
@@ -253,7 +260,13 @@ def generate_input_data(game,bot_num,trick_num):
     
     validHandCardsLayer = get_card_matrix(game.get_valid_handcards(bot_num,trick_num))
     
+    #if bot_num == 0 and trick_num == 4:
+    #    print validHandCardsLayer
+    
     validHigherHandCardsLayer = get_card_matrix(game.get_valid_higher_handcards(bot_num,trick_num))
+    
+    #if bot_num == 3 and trick_num == 2:
+    #    print validHigherHandCardsLayer
 
     lyingCards = game.get_currently_lying_cards(bot_num,trick_num)
     lyingCardsLayer = get_card_matrix(lyingCards)
@@ -359,6 +372,10 @@ def write_data(game,bot_num,trick_num,protocol_type):
     inputData = generate_input_data(game,bot_num,trick_num)
     if not prediction:
         labelData = generate_label_data(game,bot_num,trick_num)
+    
+    #if bot_num == 0 and trick_num == 0:
+    #    print str(bot_num) + ' ' + str(trick_num)
+    #    print inputData
           
     refNum = game.gameID + '_' + str(bot_num) + '_' + "%02d" % trick_num
 
