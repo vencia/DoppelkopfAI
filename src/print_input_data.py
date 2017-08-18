@@ -15,43 +15,35 @@ def load_dataset():
             print("Path not found: {}".format(path))
             sys.exit(0)
         tmp = []
-        #files = glob.glob(path + "/*." + ext)
 
-        files = sorted(glob.glob(path + str(game_id)  + '_*'),key=lambda x: int(x.rsplit('/',1)[1].rsplit('.')[0].replace("_","")))
-        print files[:20]
-        #if dataset_size != 0 and len(files) > dataset_size:
-        #    files = files[:dataset_size]
+        files = sorted(glob.glob(path + ref_num),key=lambda x: int(x.rsplit('/',1)[1].rsplit('.')[0].replace("_","")))
+
         for f in files:
-            #tmp.append(pickle.load(open(f, 'rb')))
             tmp.append(np.load(open(f, 'rb')))
         return tmp
     
-    if prediction:
-        x_data = load_data(DATA_PATH + 'input-data-' + game_type + '/')
-    else:
-        x_data = load_data(DATA_PATH + 'input-data/')
-
-    for c,data in enumerate(x_data):  
-        print c
-        print data
+    x_data = load_data(DATA_PATH + 'input-data/')
+    print x_data[0]
+    #for c,data in enumerate(x_data):  
+    #    print c
+    #    print data
     
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument("game_id", type=int)
+    parser.add_argument("game_num", type=int)
+    parser.add_argument("bot_num", type=int)
+    parser.add_argument("trick_num", type=int)
     #parser.add_argument("-num_games", type=int)
     parser.add_argument("--prediction", dest='prediction', action='store_true')
-    parser.add_argument("--live", dest='live', action='store_true')
-
-
 
     args = parser.parse_args()
-    game_id = args.game_id
+    game_num = args.game_num
+    bot_num = args.bot_num
+    trick_num = args.trick_num
+    ref_num = str(game_num) + '_' + str(bot_num) + '_' + "%02d" % trick_num
     prediction = args.prediction
-    if args.live:
-        game_type = 'live'
-    else:
-        game_type = 'full'
+    path = DATA_PATH
     if prediction:
-        DATA_PATH += 'prediction/'
+        path += 'prediction/'      
     
     load_dataset()

@@ -1,0 +1,9 @@
+game_num bot_num current_trick_num
+player_names
+handcards_bot
+0 starting_player
+cards
+1 starting_player
+cards
+...
+next played_card_by_bot

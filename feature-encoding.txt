@@ -1,6 +1,6 @@
 input
 
-position encoding: bot, player2, player3, player4 (independent of current position)
+(position encoding: bot, player2, player3, player4 (independent of current position))
 
 hand cards encoding: 4x14 (2 if double)
 
@@ -27,15 +27,14 @@ current trick info
 
 	4 units: first player
 
-history
+(history)
 
 	8 layer: played cards per player
 
 	2 layer: cards not played yet
 
-matrix without history 4x13x7
 
 ----------------------------------------------------
 output
 
-2x25 (all dissimilar cards with scores)
+2x24 (all dissimilar cards with scores)

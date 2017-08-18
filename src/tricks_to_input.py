@@ -15,11 +15,12 @@ class Player:
         self.number = number # equals index in players
         self.handcards = [] # all (known) handcards -> full for bot
         self.played_cards = [] # sorted: played_cards[:trick_num] for already played cards for current trick
+        
         #self.isRe = len([card for card in self.handcards if card.shortcut == "CQ"]) > 0
         
     def set_handcards(self,cards):
         assert len(cards) == 12
-        self.handcards = sorted(cards,key=Card.sorted_cards.index)
+        self.handcards = sorted(cards,key=lambda x: Card.sorted_cards.index(x.shortcut))
 
     def __str__(self):
         return self.name + " " + str(self.number)
@@ -91,13 +92,18 @@ class Trick:
 class Game:
     def __init__(self,game_num,bot_num,current_trick_num,players):   
         self.game_num = game_num
-        self.bot_num
-        self.current_trick_num
+        self.bot_num = bot_num
+        self.current_trick_num = current_trick_num
         self.players = players
         self.tricks = []
+        self.next_card_by_bot = None
     
     def add_trick(self,trick):
-        assert len(self.tricks) <= self.current_trick_num
+        if len(trick.cards) < 4:
+            assert len(self.tricks) == self.current_trick_num
+        else:
+            assert len(self.tricks) < self.current_trick_num
+
         
         # fill up trick with Nones
         for i in range(4-len(trick.cards)):
@@ -121,7 +127,7 @@ class Game:
         if self.tricks[trick_num].starting_player.number == player_num:
             return cards
 
-        first_card = self.tricks[trick_num].cards[0]
+        first_card = self.tricks[trick_num].cards[0]       
         if first_card.is_trump():
             trumps = [c for c in cards if c.is_trump()]
             if not trumps:
@@ -132,7 +138,86 @@ class Game:
             return cards
         return same_suit
         
+    def get_valid_higher_handcards(self,player_num,trick_num): # valid handcards that are higher than currently lying cards
+        current_highest_card_pos = self.get_current_highest_card_pos(player_num,trick_num)
+        current_highest_card = None
+        if current_highest_card_pos is not None:
+            current_highest_card = self.tricks[trick_num].cards[current_highest_card_pos]
+        return [c for c in self.get_valid_handcards(player_num,trick_num) if c.is_higher_than(current_highest_card)] 
+        
+    def get_current_highest_card_pos(self,player_num,trick_num):
+        currently_lying_cards = self.get_currently_lying_cards()
+        if not currently_lying_cards:
+            return None
+        highest_card_pos = 0
+        for c,card in enumerate(currently_lying_cards):
+            if card.is_higher_than(self.tricks[trick_num].cards[highest_card_pos]):
+                highest_card_pos = c
+        return highest_card_pos
+        
+    def is_trick_in_team(self,player_num,trick_num):
+        probs = self.get_probs_teamplayer(player_num,trick_num)
+        teamplayer = None
+        for p,prob in enumerate(probs):
+            if prob == 1.0 and p != player_num:
+                teamplayer = p
+        if teamplayer is None:
+            return False
+        highest_card_pos = self.get_current_highest_card_pos(player_num,trick_num)
+        if self.get_player_position(teamplayer,trick_num) == highest_card_pos:
+            return True
+        return False    
 
+    def get_player_position(self,player_num,trick_num):
+        return (player_num - self.tricks[trick_num].starting_player.number + 4) % 4
+
+    def get_probs_teamplayer(self,player_num,trick_num):
+        parties = [self.get_party(p,trick_num) for p in range(4)]
+        other_re = [p for p in range(4) if (parties[p] == 're' and not p == self.bot_num)]
+        
+        probs = [0.0]*4          
+        if parties[self.bot_num] == 're':
+            if len(other_re) > 0:
+                probs[other_re[0]] = 1.0
+            else:
+                probs = [0.3]*4
+        else:
+            if len(other_re) > 1:
+                probs = [1.0]*4
+                probs[other_re[0]] = 0.0
+                probs[other_re[1]] = 0.0
+            elif len(other_re) > 0:
+                probs = [0.5]*4
+                probs[other_re[0]] = 0.0
+            else:
+                probs = [0.3]*4 
+        probs[player_num] = 1.0       
+        return probs
+        
+    def get_party(self,player_num,trick_num): # from bots point of view
+        if player_num == 0 and trick_num == 4:
+            print self.players[3].played_cards[:trick_num]    
+        re_queen = Card('CQ')
+        if player_num == self.bot_num:
+            if re_queen in self.players[player_num].handcards:
+                return 're'
+            else:
+                return 'contra'
+        else:
+            if re_queen in self.players[player_num].played_cards[:trick_num]:
+                return 're'
+            else:
+                other_outed_re_num = sum([(re_queen in self.players[p].played_cards[:trick_num]) for p in range(4) if not p == self.bot_num])
+                if self.get_party(self.bot_num,trick_num) == 're':
+                    if other_outed_re_num == 1:
+                        return 'contra'
+                else:
+                    if other_outed_re_num == 2:
+                        return 'contra'
+        return None
+        
+    def get_currently_lying_cards(self):
+        return [c for c in self.tricks[self.current_trick_num].cards if c is not None]
 
     def __str__(self):
         s = ""
@@ -151,29 +236,40 @@ def main():
     args = parser.parse_args()
     print(args)
     prediction = args.prediction
+    path = DATA_PATH
+    if prediction:
+        path += 'prediction/'        
     
-    files = sorted(glob.glob(DATA_PATH + 'game-protocols/' + "/*.csv"),key=lambda x: int(x.rsplit('/',1)[1].rsplit('.')[0].replace("_","")))
+    files = sorted(glob.glob(DATA_PATH + 'trick-protocols/' + "/*.csv"),key=lambda x: int(x.rsplit('/',1)[1].rsplit('.')[0].replace("_","")))
     for f in files:
-        greader = csv.reader(open(f))       
+        greader = csv.reader(open(f), delimiter=' ', quotechar='|', quoting=csv.QUOTE_MINIMAL)       
         game = parse_game(greader)
         input_data = generate_input_data(game)
-        
-        path = DATA_PATH
-        if prediction:
-            path += 'prediction/'        
-        ref_num = str(game.game_num) + '_' + str(game.bot.number) + '_' + "%02d" % game.current_trick.number
+               
+        ref_num = str(game.game_num) + '_' + str(game.bot_num) + '_' + "%02d" % game.current_trick_num
         np.save(open(path + 'input-data/' + ref_num, 'wb'),input_data)   
+        
+        if game.next_card_by_bot is not None:
+            label_data = generate_label_data(game)
+            np.save(open(path + 'label-data/' + ref_num, 'wb'),label_data)   
+
+def generate_label_data(game):
+    vector = np.zeros(24)
+    next_card = game.next_card_by_bot
+    next_card_idx = Card.sorted_values.index(next_card.value) + Card.sorted_suits.index(next_card.suit)*6
+    vector[next_card_idx] = 1  
+    return vector
             
 def generate_input_data(game):
-    b = game.bot.number
-    t = game.current_trick.number
+    b = game.bot_num
+    t = game.current_trick_num
     handcards_layer = get_card_matrix(game.get_current_handcards(b,t)) 
     
     valid_handcards_layer = get_card_matrix(game.get_valid_handcards(b,t))
     
     valid_higher_handcards_layer = get_card_matrix(game.get_valid_higher_handcards(b,t))
 
-    lying_cards = game.get_currently_lying_cards(b,t)
+    lying_cards = game.get_currently_lying_cards()
     lying_cards_layer = get_card_matrix(lying_cards)
     
     lying_cards_sum = 0
@@ -233,8 +329,11 @@ def parse_game(greader):
     for c,row in enumerate(greader): # parse game
         if  c % 2 == 0:
             assert len(row) == 2
-            trick_num = row[0]
-            starting_player = [p for p in players if p.name == row[1]][0]
+            if row[0] == 'next':
+                game.next_card_by_bot = Card(row[1])
+            else:
+                trick_num = int(row[0])
+                starting_player = [p for p in players if p.name == row[1]][0]
         else:
             assert len(row) <= 4
             lying_cards =[Card(card_shortcut) for card_shortcut in row]
@@ -242,8 +341,8 @@ def parse_game(greader):
                 assert current_trick_num == trick_num
             game.add_trick(Trick(starting_player,lying_cards,trick_num))
     
-    if bot_num == starting_player.number:
-        assert len(tricks[len(tricks)-1].cards) == 4
+    if bot_num == starting_player.number and current_trick_num == len(game.tricks):
+        assert len(tricks) == 0 or len(tricks[len(tricks)-1].cards) == 4
         trick_num += 1
         game.add_trick(Trick(starting_player,[],trick_num))
         
@@ -252,14 +351,14 @@ def parse_game(greader):
 def get_card_matrix(cards):
     matrix = np.zeros(shape=(4,14))
     for card in cards:
-        row = Card.sortedSuits.index(card.suit)
-        if card.value in Card.sortedNonTrumpValues:
+        row = Card.sorted_suits.index(card.suit)
+        if card.value in Card.sorted_non_trump_values:
             if card.shortcut == "H10":
                 column = 12
             else:
-                column = Card.sortedNonTrumpValues.index(card.value)
+                column = Card.sorted_non_trump_values.index(card.value)
         else:
-            column = Card.sortedTrump.index(card.shortcut)
+            column = Card.sorted_trump.index(card.shortcut)
         matrix[row][column] += 1
     return matrix
 

@@ -1,0 +1,7 @@
+game_num
+player_names
+0 starting_player
+cards
+1 starting_player
+cards
+...
