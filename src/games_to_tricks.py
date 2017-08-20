@@ -23,12 +23,13 @@ def main():
     
     files = sorted(glob.glob(DATA_PATH + 'game-protocols/' + "/*.csv"),key=lambda x: int(x.rsplit('/',1)[1].rsplit('.')[0].replace("_","")))
     for f in files:
-        greader = csv.reader(open(f),delimiter=' ')       
+        greader = csv.reader(open(f),delimiter=';') 
         generate_tricks(greader,path)
 
         
 def generate_tricks(greader,path):
     game_info = next(greader)
+    print game_info
     assert len(game_info) == 1
     game_num = int(game_info[0])
     
@@ -58,7 +59,7 @@ def generate_tricks(greader,path):
         for t in range(12):       
             ref_num = str(game_num) + '_' + str(cp) + '_' + "%02d" % t
             with open(path + 'trick-protocols/' + ref_num + '.csv', 'w') as f:
-                gwriter = csv.writer(f, delimiter=' ', quotechar='|', quoting=csv.QUOTE_MINIMAL)
+                gwriter = csv.writer(f, delimiter=';', quotechar='|', quoting=csv.QUOTE_MINIMAL)
                 gwriter.writerow([game_num,cp,t])
                 gwriter.writerow(player_names)
                 gwriter.writerow(handcards[cp])
@@ -70,9 +71,6 @@ def generate_tricks(greader,path):
                 lying_cards_num = (cp-starting_player_num + 4) % 4
                 gwriter.writerow(card_lines[t][:lying_cards_num])
                 gwriter.writerow(['next',card_lines[t][lying_cards_num]])
-
-
-    
 
     
 def get_cards_sorted_by_player(starting_player_num,cards):

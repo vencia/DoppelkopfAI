@@ -30,7 +30,7 @@ def load_dataset():
             tmp_t.append(trick_num)
         return tmp_x, tmp_b, tmp_t
 
-    x, b, t = load_data(DATA_PATH + 'prediction/input-data-' + game_type + '/')
+    x, b, t = load_data(DATA_PATH + 'input-data/')
 
 
     #y = load_data(DATA_PATH + 'prediction/label-data/')
@@ -38,12 +38,12 @@ def load_dataset():
     return np.array(x), b, t
     
 def get_top_cards(pred,top_num):
-    sortedValues = ["9","10","J","Q","K","A"]
-    sortedSuits = ["D","H","S","C"]
+    sorted_values = ["9","10","J","Q","K","A"]
+    sorted_suits = ["D","H","S","C"]
     top_preds = list(reversed(sorted(range(len(pred)), key=lambda i: pred[i])))[:top_num]
     cards = []
     for idx in top_preds:
-        cards.append(sortedSuits[idx / 6] + sortedValues[idx % 6])    
+        cards.append(sorted_suits[idx / 6] + sorted_values[idx % 6])    
     return cards
 
 class Tee(object): # logging to console and file
@@ -57,17 +57,13 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('model_folder', type=str)
     parser.add_argument('game_id', type=int)
-    parser.add_argument('--live', dest='live', action='store_true')
 
     args = parser.parse_args()
     game_id = str(args.game_id)
-    if args.live:
-        game_type = 'live'
-    else:
-        game_type = 'full'
+
     
     MODEL_PATH = DATA_PATH + args.model_folder + '/'
-    infoFile = open(MODEL_PATH + 'pred_info_' + game_id + '_' + game_type + '.log', 'w')
+    infoFile = open(MODEL_PATH + 'pred_info_' + game_id + '.log', 'w')
     backup = sys.stdout
     sys.stdout = Tee(sys.stdout, infoFile)
     
@@ -102,14 +98,14 @@ if __name__ == '__main__':
     #score = model.evaluate(x, y, verbose=0)
 
     predictions = model.predict(x)
-    np.savetxt(MODEL_PATH + 'pred_' + game_id + '_' + game_type + '.csv',predictions)
+    np.savetxt(MODEL_PATH + 'pred_' + game_id + '.csv',predictions)
     for c,pred in enumerate(predictions):
         formatted_predictions = ['%.2f' % p for p in pred]
         player = b[c]
         trick = t[c]
         #if player == 0 and trick == 4:
         #    print x[c]
-        print 'player ' + str(player) + ' trick ' + str(trick+1)
+        print 'player ' + str(player) + ' trick ' + str(trick)
         print get_top_cards(pred,3)
         print formatted_predictions
     

@@ -1,4 +1,4 @@
 find . -maxdepth 1 -type f |head -1000|xargs cp -t ../input-data-small
-find . -maxdepth 1 -type f |head -1000|xargs cp -t ../label-data-small
- rm -rf ~/.local/share/Trash/*
+find . -type f | wc -l
+rm -rf ~/.local/share/Trash/*
 

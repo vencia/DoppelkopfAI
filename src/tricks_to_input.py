@@ -14,7 +14,7 @@ class Player:
         self.name = name
         self.number = number # equals index in players
         self.handcards = [] # all (known) handcards -> full for bot
-        self.played_cards = [] # sorted: played_cards[:trick_num] for already played cards for current trick
+        self.played_cards = [] # sorted
         
         #self.isRe = len([card for card in self.handcards if card.shortcut == "CQ"]) > 0
         
@@ -113,12 +113,20 @@ class Game:
         # add cards to played cards of players
         for p in self.players:
             played_card = trick.get_cards_sorted_by_player()[p.number]
+           # if self.bot_num == 0 and self.current_trick_num == 4:
+           #     print played_card
             if played_card is not None:
                 p.played_cards.append(played_card)
+                
+    def get_current_played_cards(self,player_num,trick_num): # viewpoint of bot
+        if self.get_player_position(player_num,trick_num) < self.get_player_position(self.bot_num,trick_num):
+            return self.players[player_num].played_cards[:trick_num+1]
+        else:
+            return self.players[player_num].played_cards[:trick_num]
              
     def get_current_handcards(self,player_num,trick_num):
         handcards_copy = self.players[player_num].handcards[:]
-        for card in self.players[player_num].played_cards[:trick_num]:
+        for card in self.get_current_played_cards(player_num,trick_num):
             handcards_copy.remove(card)
         return handcards_copy   
         
@@ -195,8 +203,8 @@ class Game:
         return probs
         
     def get_party(self,player_num,trick_num): # from bots point of view
-        if player_num == 0 and trick_num == 4:
-            print self.players[3].played_cards[:trick_num]    
+       # if player_num == 0 and trick_num == 4:
+       #     print self.players[3].played_cards[:trick_num]    
         re_queen = Card('CQ')
         if player_num == self.bot_num:
             if re_queen in self.players[player_num].handcards:
@@ -204,10 +212,10 @@ class Game:
             else:
                 return 'contra'
         else:
-            if re_queen in self.players[player_num].played_cards[:trick_num]:
+            if re_queen in self.get_current_played_cards(player_num,trick_num):
                 return 're'
             else:
-                other_outed_re_num = sum([(re_queen in self.players[p].played_cards[:trick_num]) for p in range(4) if not p == self.bot_num])
+                other_outed_re_num = sum([(re_queen in self.get_current_played_cards(p,trick_num)) for p in range(4) if not p == self.bot_num])
                 if self.get_party(self.bot_num,trick_num) == 're':
                     if other_outed_re_num == 1:
                         return 'contra'
@@ -231,18 +239,18 @@ class Game:
 def main():
     parser = argparse.ArgumentParser()
     #parser.add_argument("-num", type=int)
-    parser.add_argument("--prediction", dest='prediction', action='store_true')
+    #parser.add_argument("--prediction", dest='prediction', action='store_true')
     #parser.add_argument("--small", dest='small_dataset', action='store_true')
     args = parser.parse_args()
     print(args)
-    prediction = args.prediction
+    #prediction = args.prediction
     path = DATA_PATH
-    if prediction:
-        path += 'prediction/'        
+   # if prediction:
+   #     path += 'prediction/'        
     
     files = sorted(glob.glob(DATA_PATH + 'trick-protocols/' + "/*.csv"),key=lambda x: int(x.rsplit('/',1)[1].rsplit('.')[0].replace("_","")))
     for f in files:
-        greader = csv.reader(open(f), delimiter=' ', quotechar='|', quoting=csv.QUOTE_MINIMAL)       
+        greader = csv.reader(open(f), delimiter=';', quotechar='|', quoting=csv.QUOTE_MINIMAL)       
         game = parse_game(greader)
         input_data = generate_input_data(game)
                

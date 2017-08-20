@@ -4,7 +4,7 @@ input
 
 hand cards encoding: 4x14 (2 if double)
 
-	9,k,10,a,b_karo,b_herz,b_pik,b_kreuz,...,dulle,schwein
+	9,k,10,a,b_karo,b_herz,b_pik,b_kreuz,...,dulle,(schwein) <- offizielle regeln ohne schwein
 karo
 herz
 pik

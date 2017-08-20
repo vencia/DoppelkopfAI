@@ -5,11 +5,9 @@ import matplotlib.pyplot as plt
 import datetime
 import os
 import sys
-import pickle
 import glob
 import numpy as np
 import argparse
-import random
 import keras
 from keras.models import Sequential
 from keras.layers import Dense, Dropout, Flatten
@@ -38,12 +36,8 @@ def load_dataset():
             tmp.append(np.load(open(f, 'rb')))
         return tmp
     
-    if small_dataset:
-        x_data = load_data(DATA_PATH + 'input-data-small/')
-        y_data = load_data(DATA_PATH + 'label-data-small/')
-    else:
-        x_data = load_data(DATA_PATH + 'input-data/')
-        y_data = load_data(DATA_PATH + 'label-data/')
+    x_data = load_data(DATA_PATH + 'input-data/')
+    y_data = load_data(DATA_PATH + 'label-data/')
     
     # shuffle changes axes ordering??!!!
     #data = list(zip(x_data,y_data))
@@ -128,17 +122,13 @@ if __name__ == '__main__':
     parser.add_argument("-batch_size", type=int, default=128)
     parser.add_argument("-lr", type=float, default=0.001)
     #parser.add_argument("-num_games", type=int)
-    parser.add_argument("--small", dest='small_dataset', action='store_true')
+    #parser.add_argument("--small", dest='small_dataset', action='store_true')
 
 
     args = parser.parse_args()
     epochs = args.epochs
     batch_size = args.batch_size
     learning_rate = args.lr
-    #dataset_size = 0
-    #if args.num_games:
-    #    dataset_size = args.num_games*4*12
-    small_dataset = args.small_dataset
         
     foldername = datetime.datetime.now().strftime('%Y-%m-%d_%H-%M')
     MODEL_PATH = DATA_PATH + foldername + '/'
