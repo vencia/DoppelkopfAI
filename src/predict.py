@@ -4,13 +4,10 @@ import sys
 import os
 import glob
 import argparse
-import pickle
 import numpy as np
 import keras
 from keras.models import model_from_json
 from keras import backend as K
-
-DATA_PATH = '../data/'
 
 def load_dataset():
     def load_data(path):
@@ -30,7 +27,7 @@ def load_dataset():
             tmp_t.append(trick_num)
         return tmp_x, tmp_b, tmp_t
 
-    x, b, t = load_data(DATA_PATH + 'input-data/')
+    x, b, t = load_data(net_data_path + 'input-data/')
 
 
     #y = load_data(DATA_PATH + 'prediction/label-data/')
@@ -57,25 +54,27 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('model_folder', type=str)
     parser.add_argument('game_id', type=int)
+    parser.add_argument("-net_data_path", type=str, default='../data/')
+    #parser.add_argument("-data_path", type=str, default='/media/vencia/Daten/DoppelkopfAI/data/')
 
     args = parser.parse_args()
     game_id = str(args.game_id)
+    net_data_path = args.net_data_path   
 
-    
-    MODEL_PATH = DATA_PATH + args.model_folder + '/'
-    infoFile = open(MODEL_PATH + 'pred_info_' + game_id + '.log', 'w')
+    model_path = net_data_path + args.model_folder + '/'
+    infoFile = open(model_path + 'pred_info_' + game_id + '.log', 'w')
     backup = sys.stdout
     sys.stdout = Tee(sys.stdout, infoFile)
     
     print(args)
     
     # load json and create model
-    json_file = open(MODEL_PATH + 'model.json', 'r')
+    json_file = open(model_path + 'model.json', 'r')
     loaded_model_json = json_file.read()
     json_file.close()
     model = model_from_json(loaded_model_json)
     # load weights into new model
-    model.load_weights(MODEL_PATH + "model_weights.h5")
+    model.load_weights(model_path + "model_weights.h5")
     #print("Loaded model from disk")
      
     x, b, t = load_dataset()
@@ -98,7 +97,7 @@ if __name__ == '__main__':
     #score = model.evaluate(x, y, verbose=0)
 
     predictions = model.predict(x)
-    np.savetxt(MODEL_PATH + 'pred_' + game_id + '.csv',predictions)
+    np.savetxt(model_path + 'pred_' + game_id + '.csv',predictions)
     for c,pred in enumerate(predictions):
         formatted_predictions = ['%.2f' % p for p in pred]
         player = b[c]
@@ -107,6 +106,6 @@ if __name__ == '__main__':
         #    print x[c]
         print 'player ' + str(player) + ' trick ' + str(trick)
         print get_top_cards(pred,3)
-        print formatted_predictions
+        #print formatted_predictions
     
 

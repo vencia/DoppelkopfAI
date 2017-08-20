@@ -1,4 +1,0 @@
-input normalization
-initial loss too low, expected: -ln(num_classes)
-fixed - test loss lower than train loss / test accuracy better
-parser potentially broken, parse whole dataset and train again, compare

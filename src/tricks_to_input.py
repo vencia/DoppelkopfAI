@@ -7,8 +7,6 @@ import numpy as np
 
 np.set_printoptions(threshold=500)
 
-DATA_PATH = '../data/'
-
 class Player:
     def __init__(self,name,number):
         self.name = name
@@ -238,28 +236,28 @@ class Game:
 
 def main():
     parser = argparse.ArgumentParser()
+    parser.add_argument("-data_path", type=str, default='/media/vencia/Daten/DoppelkopfAI/data/')
+    parser.add_argument("-net_data_path", type=str, default='../data/')
     #parser.add_argument("-num", type=int)
     #parser.add_argument("--prediction", dest='prediction', action='store_true')
     #parser.add_argument("--small", dest='small_dataset', action='store_true')
     args = parser.parse_args()
     print(args)
-    #prediction = args.prediction
-    path = DATA_PATH
-   # if prediction:
-   #     path += 'prediction/'        
+    data_path = args.data_path
+    net_data_path = args.net_data_path        
     
-    files = sorted(glob.glob(DATA_PATH + 'trick-protocols/' + "/*.csv"),key=lambda x: int(x.rsplit('/',1)[1].rsplit('.')[0].replace("_","")))
+    files = sorted(glob.glob(data_path + 'trick-protocols/' + "/*.csv"),key=lambda x: int(x.rsplit('/',1)[1].rsplit('.')[0].replace("_","")))
     for f in files:
         greader = csv.reader(open(f), delimiter=';', quotechar='|', quoting=csv.QUOTE_MINIMAL)       
         game = parse_game(greader)
         input_data = generate_input_data(game)
                
         ref_num = str(game.game_num) + '_' + str(game.bot_num) + '_' + "%02d" % game.current_trick_num
-        np.save(open(path + 'input-data/' + ref_num, 'wb'),input_data)   
+        np.save(open(net_data_path + 'input-data/' + ref_num, 'wb'),input_data)   
         
         if game.next_card_by_bot is not None:
             label_data = generate_label_data(game)
-            np.save(open(path + 'label-data/' + ref_num, 'wb'),label_data)   
+            np.save(open(net_data_path + 'label-data/' + ref_num, 'wb'),label_data)   
 
 def generate_label_data(game):
     vector = np.zeros(24)

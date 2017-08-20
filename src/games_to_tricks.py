@@ -7,27 +7,22 @@ import numpy as np
 
 np.set_printoptions(threshold=500)
 
-DATA_PATH = '../data/'
-
 def main():
     parser = argparse.ArgumentParser()
-    #parser.add_argument("-num", type=int)
-    parser.add_argument("--prediction", dest='prediction', action='store_true')
+    parser.add_argument("-data_path", type=str, default='/media/vencia/Daten/DoppelkopfAI/data/')
+    #parser.add_argument("--prediction", dest='prediction', action='store_true')
     #parser.add_argument("--small", dest='small_dataset', action='store_true')
     args = parser.parse_args()
     print(args)
-    prediction = args.prediction
-    path = DATA_PATH
-    if prediction:
-        path += 'prediction/'        
+    data_path = args.data_path   
     
-    files = sorted(glob.glob(DATA_PATH + 'game-protocols/' + "/*.csv"),key=lambda x: int(x.rsplit('/',1)[1].rsplit('.')[0].replace("_","")))
+    files = sorted(glob.glob(data_path + 'game-protocols/' + "/*.csv"),key=lambda x: int(x.rsplit('/',1)[1].rsplit('.')[0].replace("_","")))
     for f in files:
         greader = csv.reader(open(f),delimiter=';') 
-        generate_tricks(greader,path)
+        generate_tricks(greader,data_path)
 
         
-def generate_tricks(greader,path):
+def generate_tricks(greader,data_path):
     game_info = next(greader)
     print game_info
     assert len(game_info) == 1
@@ -58,7 +53,7 @@ def generate_tricks(greader,path):
     for cp,p in enumerate(player_names):
         for t in range(12):       
             ref_num = str(game_num) + '_' + str(cp) + '_' + "%02d" % t
-            with open(path + 'trick-protocols/' + ref_num + '.csv', 'w') as f:
+            with open(data_path + 'trick-protocols/' + ref_num + '.csv', 'w') as f:
                 gwriter = csv.writer(f, delimiter=';', quotechar='|', quoting=csv.QUOTE_MINIMAL)
                 gwriter.writerow([game_num,cp,t])
                 gwriter.writerow(player_names)

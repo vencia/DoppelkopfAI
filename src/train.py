@@ -16,8 +16,6 @@ from keras import backend as K
 from keras.callbacks import CSVLogger
 from keras.callbacks import TensorBoard
 
-DATA_PATH = '../data/'
-
 NUM_CLASSES = 24
 
 def load_dataset():
@@ -36,8 +34,8 @@ def load_dataset():
             tmp.append(np.load(open(f, 'rb')))
         return tmp
     
-    x_data = load_data(DATA_PATH + 'input-data/')
-    y_data = load_data(DATA_PATH + 'label-data/')
+    x_data = load_data(net_data_path + 'input-data/')
+    y_data = load_data(net_data_path + 'label-data/')
     
     # shuffle changes axes ordering??!!!
     #data = list(zip(x_data,y_data))
@@ -93,7 +91,7 @@ def plot(history):
     plt.xlabel('epoch')
     plt.legend(['train', 'test'], loc='upper left')
     #plt.show()
-    plt.savefig(MODEL_PATH + 'accuracy.png')
+    plt.savefig(model_path + 'accuracy.png')
     plt.clf()
     
     # summarize history for loss
@@ -104,7 +102,7 @@ def plot(history):
     plt.xlabel('epoch')
     plt.legend(['train', 'test'], loc='upper left')
    # plt.show()
-    plt.savefig(MODEL_PATH + 'loss.png')
+    plt.savefig(model_path + 'loss.png')
     
 def get_execution_time_in_minutes(start_time):
     return int((datetime.datetime.now() - start_time).total_seconds()/60)
@@ -118,6 +116,8 @@ class Tee(object): # logging to console and file
     
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
+    #parser.add_argument("-data_path", type=str, default='/media/vencia/Daten/DoppelkopfAI/data/')
+    parser.add_argument("-net_data_path", type=str, default='../data/')
     parser.add_argument("-epochs", type=int, default=10)
     parser.add_argument("-batch_size", type=int, default=128)
     parser.add_argument("-lr", type=float, default=0.001)
@@ -126,22 +126,24 @@ if __name__ == '__main__':
 
 
     args = parser.parse_args()
+    #data_path = args.data_path
+    net_data_path = args.net_data_path
     epochs = args.epochs
     batch_size = args.batch_size
     learning_rate = args.lr
         
     foldername = datetime.datetime.now().strftime('%Y-%m-%d_%H-%M')
-    MODEL_PATH = DATA_PATH + foldername + '/'
-    os.mkdir(MODEL_PATH)
-    infoFile = open(MODEL_PATH + 'train_info.log', 'w')
+    model_path = net_data_path + foldername + '/'
+    os.mkdir(model_path)
+    infoFile = open(model_path + 'train_info.log', 'w')
     backup = sys.stdout
     sys.stdout = Tee(sys.stdout, infoFile)
     
     callback_loggers = []
-    csv_logger = CSVLogger(MODEL_PATH + 'training.csv')
+    csv_logger = CSVLogger(model_path + 'training.csv')
     callback_loggers.append(csv_logger)
     if K.backend() == 'tensorflow':
-        tensorboard_logger = TensorBoard(log_dir=MODEL_PATH + 'tensorboard', histogram_freq=0, batch_size=batch_size, write_graph=True, write_grads=False, write_images=True, embeddings_freq=0, embeddings_layer_names=None, embeddings_metadata=None)
+        tensorboard_logger = TensorBoard(log_dir=model_path + 'tensorboard', histogram_freq=0, batch_size=batch_size, write_graph=True, write_grads=False, write_images=True, embeddings_freq=0, embeddings_layer_names=None, embeddings_metadata=None)
         callback_loggers.append(tensorboard_logger)
         #tensorboard --logdir=/full_path_to_your_logs
 
@@ -174,10 +176,10 @@ if __name__ == '__main__':
     
     # serialize model to JSON
     model_json = model.to_json()
-    with open(MODEL_PATH  + "model.json", "w") as json_file:
+    with open(model_path  + "model.json", "w") as json_file:
         json_file.write(model_json)
     # serialize weights to HDF5
-    model.save_weights(MODEL_PATH + "model_weights.h5")
+    model.save_weights(model_path + "model_weights.h5")
     
     plot(history)
     
