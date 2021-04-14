@@ -102,3 +102,8 @@ ENV/
 
 # mypy
 .mypy_cache/
+
+.idea/
+
+data/
+scrape_games.sh
